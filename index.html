@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Redirecionando...</title>
     
-    <!-- Meta tag para redirecionamento automático em 3 segundos -->
-    <meta http-equiv="refresh" content="3;url=https://e34b21e70586.ngrok-free.app/site-sistema-git/site-sistema/">
-    
     <style>
         * {
             margin: 0;
@@ -88,6 +85,26 @@
             font-size: 14px;
         }
         
+        .error-box {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c62828;
+            font-size: 14px;
+        }
+        
+        .loading-box {
+            background: #fff3e0;
+            color: #ef6c00;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ef6c00;
+            font-size: 14px;
+        }
+        
         .btn-manual {
             width: 100%;
             padding: 14px;
@@ -101,6 +118,13 @@
             transition: transform 0.2s;
             text-decoration: none;
             display: inline-block;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        
+        .btn-manual.active {
+            opacity: 1;
+            pointer-events: auto;
         }
         
         .btn-manual:hover {
@@ -157,16 +181,16 @@
         
         <div class="spinner"></div>
         
-        <div class="info-box">
-            <strong>Redirecionamento automático:</strong> Você será direcionado para o destino em instantes.
+        <div class="loading-box" id="status-box">
+            <strong>Carregando:</strong> Buscando destino do redirecionamento...
         </div>
         
-        <div class="countdown-container">
+        <div class="countdown-container" id="countdown-container" style="display: none;">
             <div class="countdown-text">Tempo restante:</div>
-            <div class="countdown" id="countdown">3</div>
+            <div class="countdown" id="countdown">5</div>
         </div>
         
-        <a href="" id="manual-link" class="btn-manual">
+        <a href="#" id="manual-link" class="btn-manual">
             Clique aqui se não for redirecionado
         </a>
         
@@ -176,36 +200,170 @@
     </div>
 
     <script>
-        const REDIRECT_URL = 'https://91d0f82d23ff.ngrok-free.app/site-sistema-git/site-sistema/';
-        const REDIRECT_TIME = 3; // segundos
+        const JSON_URL = 'https://raw.githubusercontent.com/Hermes-neptune/site-sistema-Redirecionamento/refs/heads/main/api.json';
+        const REDIRECT_TIME = 5;
         
+        const statusBox = document.getElementById('status-box');
+        const countdownContainer = document.getElementById('countdown-container');
         const countdownElement = document.getElementById('countdown');
         const manualLinkElement = document.getElementById('manual-link');
         
-        manualLinkElement.href = REDIRECT_URL;
+        let redirectUrl = null;
+        let countdownTimer = null;
         
-        let timeLeft = REDIRECT_TIME;
+        function showError(message) {
+            statusBox.className = 'error-box';
+            statusBox.innerHTML = `<strong>Erro:</strong> ${message}`;
+            manualLinkElement.textContent = 'Tentar novamente';
+            manualLinkElement.onclick = () => window.location.reload();
+            manualLinkElement.classList.add('active');
+        }
         
-        const countdownTimer = setInterval(() => {
-            timeLeft--;
+        function startCountdown(url) {
+            redirectUrl = url;
+            manualLinkElement.href = url;
+            manualLinkElement.classList.add('active');
+            
+            statusBox.className = 'info-box';
+            statusBox.innerHTML = `<strong>Redirecionamento automático:</strong> Você será direcionado para o destino em instantes.`;
+            
+            countdownContainer.style.display = 'block';
+            
+            let timeLeft = REDIRECT_TIME;
             countdownElement.textContent = timeLeft;
             
-            if (timeLeft <= 0) {
-                clearInterval(countdownTimer);
-                countdownElement.textContent = '0';
+            countdownTimer = setInterval(() => {
+                timeLeft--;
+                countdownElement.textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(countdownTimer);
+                    countdownElement.textContent = '0';
+                    
+                    setTimeout(() => {
+                        window.location.href = url;
+                    }, 100);
+                }
+            }, 1000);
+        }
+        
+        function fetchRedirectUrl() {
+            try {
+                statusBox.innerHTML = '<strong>Carregando:</strong> Conectando ao servidor...';
+                
+                fetch(JSON_URL, {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erro HTTP: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    statusBox.innerHTML = '<strong>Carregando:</strong> Processando dados...';
+                    processJsonData(data);
+                })
+                .catch(error => {
+                    console.log('Fetch direto falhou, tentando proxy:', error);
+                    tryWithProxy();
+                });
+                
+            } catch (error) {
+                console.error('Erro ao buscar URL:', error);
+                showError(`Não foi possível carregar o destino (${error.message})`);
+            }
+        }
+        
+        function tryWithProxy() {
+            statusBox.innerHTML = '<strong>Carregando:</strong> Tentando rota alternativa...';
+            
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(JSON_URL)}`;
+            
+            fetch(proxyUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erro no proxy: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(proxyData => {
+                const data = JSON.parse(proxyData.contents);
+                statusBox.innerHTML = '<strong>Carregando:</strong> Processando dados...';
+                processJsonData(data);
+            })
+            .catch(error => {
+                console.error('Proxy também falhou:', error);
+                tryWithScriptTag();
+            });
+        }
+        
+        function tryWithScriptTag() {
+            statusBox.innerHTML = '<strong>Carregando:</strong> Última tentativa...';
+            
+            const corsProxyUrl = `https://cors-anywhere.herokuapp.com/${JSON_URL}`;
+            
+            fetch(corsProxyUrl, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erro no segundo proxy: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                statusBox.innerHTML = '<strong>Carregando:</strong> Processando dados...';
+                processJsonData(data);
+            })
+            .catch(error => {
+                console.error('Todas as tentativas falharam:', error);
+                showError('Não foi possível conectar ao servidor. Verifique sua conexão.');
+            });
+        }
+        
+        function processJsonData(data) {
+            try {
+                
+                if (data.status !== 'success') {
+                    throw new Error(`Status do JSON: ${data.status}`);
+                }
+                
+                if (!data.link) {
+                    throw new Error('Link não encontrado no arquivo JSON');
+                }
+                
+                const urlPattern = /^https?:\/\/.+/;
+                if (!urlPattern.test(data.link)) {
+                    throw new Error('Link inválido no arquivo JSON');
+                }
+                
+                statusBox.innerHTML = '<strong>Sucesso:</strong> Destino encontrado! Iniciando redirecionamento...';
                 
                 setTimeout(() => {
-                    window.location.href = REDIRECT_URL;
-                }, 100);
+                    startCountdown(data.link+'/site-sistema-git/site-sistema/');
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Erro ao processar dados:', error);
+                showError(`Dados inválidos no JSON (${error.message})`);
             }
-        }, 1000);
+        }
+        
+        fetchRedirectUrl();
         
         setTimeout(() => {
-            if (window.location.href.indexOf(REDIRECT_URL) === -1) {
-                window.location.href = REDIRECT_URL;
+            if (!redirectUrl && !countdownTimer) {
+                showError('Tempo limite excedido ao carregar destino');
             }
-        }, REDIRECT_TIME * 1000 + 500);
+        }, 10000);
     </script>
 </body>
-
 </html>
